@@ -28,6 +28,7 @@ use JMS\JobQueueBundle\Event\StateChangeEvent;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use DateTime;
+use Doctrine\DBAL\LockMode;
 
 class JobRepository extends EntityRepository
 {
@@ -54,6 +55,18 @@ class JobRepository extends EntityRepository
     public function setRegistry(RegistryInterface $registry)
     {
         $this->registry = $registry;
+    }
+
+    public function startTrasaction() {
+        $this->_em->getConnection()->beginTransaction(); //according http://stackoverflow.com/a/16271223, transaction automatically releases row-level write lock
+    }
+
+    public function commitTransaction() {
+        $this->_em->getConnection()->commit();
+    }
+
+    public function rollbackTransaction() {
+        $this->_em->getConnection()->rollback();
     }
 
     public function findJob($command, array $args = array())
@@ -85,10 +98,10 @@ class JobRepository extends EntityRepository
         $this->_em->flush($job);
 
         $firstJob = $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args ORDER BY j.id ASC")
-             ->setParameter('command', $command)
-             ->setParameter('args', $args, 'json_array')
-             ->setMaxResults(1)
-             ->getSingleResult();
+            ->setParameter('command', $command)
+            ->setParameter('args', $args, 'json_array')
+            ->setMaxResults(1)
+            ->getSingleResult();
 
         if ($firstJob === $job) {
             $job->setState(Job::STATE_PENDING);
@@ -130,9 +143,9 @@ class JobRepository extends EntityRepository
         $rsm->addRootEntityFromClassMetadata('JMSJobQueueBundle:Job', 'j');
 
         return $this->_em->createNativeQuery("SELECT j.* FROM jms_jobs j INNER JOIN jms_job_related_entities r ON r.job_id = j.id WHERE r.related_class = :relClass AND r.related_id = :relId", $rsm)
-                    ->setParameter('relClass', $relClass)
-                    ->setParameter('relId', $relId)
-                    ->getResult();
+            ->setParameter('relClass', $relClass)
+            ->setParameter('relId', $relId)
+            ->getResult();
     }
 
     public function findJobForRelatedEntity($command, $relatedEntity)
@@ -143,10 +156,10 @@ class JobRepository extends EntityRepository
         $rsm->addRootEntityFromClassMetadata('JMSJobQueueBundle:Job', 'j');
 
         return $this->_em->createNativeQuery("SELECT j.* FROM jms_jobs j INNER JOIN jms_job_related_entities r ON r.job_id = j.id WHERE r.related_class = :relClass AND r.related_id = :relId AND j.command = :command", $rsm)
-                   ->setParameter('command', $command)
-                   ->setParameter('relClass', $relClass)
-                   ->setParameter('relId', $relId)
-                   ->getOneOrNullResult();
+            ->setParameter('command', $command)
+            ->setParameter('relClass', $relClass)
+            ->setParameter('relId', $relId)
+            ->getOneOrNullResult();
     }
 
     private function getRelatedEntityIdentifier($entity)
@@ -159,7 +172,7 @@ class JobRepository extends EntityRepository
 
         $relClass = ClassUtils::getClass($entity);
         $relId = $this->registry->getManagerForClass($relClass)->getMetadataFactory()
-                    ->getMetadataFor($relClass)->getIdentifierValues($entity);
+            ->getMetadataFor($relClass)->getIdentifierValues($entity);
         asort($relId);
 
         if ( ! $relId) {
@@ -174,13 +187,13 @@ class JobRepository extends EntityRepository
         if ( ! $excludedIds) {
             $excludedIds = array(-1);
         }
-
         return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j LEFT JOIN j.dependencies d WHERE j.executeAfter < :now AND j.state = :state AND j.id NOT IN (:excludedIds) ORDER BY j.id ASC")
-                    ->setParameter('state', Job::STATE_PENDING)
-                    ->setParameter('excludedIds', $excludedIds)
-                    ->setParameter('now', new DateTime())
-                    ->setMaxResults(1)
-                    ->getOneOrNullResult();
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setMaxResults(1)
+            ->setParameter('state', Job::STATE_PENDING)
+            ->setParameter('excludedIds', $excludedIds)
+            ->setParameter('now', new DateTime())
+            ->getOneOrNullResult();
     }
 
     public function closeJob(Job $job, $finalState)
@@ -290,22 +303,22 @@ class JobRepository extends EntityRepository
     public function findIncomingDependencies(Job $job)
     {
         return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j LEFT JOIN j.dependencies d WHERE :job MEMBER OF j.dependencies")
-                    ->setParameter('job', $job)
-                    ->getResult();
+            ->setParameter('job', $job)
+            ->getResult();
     }
 
     public function getIncomingDependencies(Job $job)
     {
         return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE :job MEMBER OF j.dependencies")
-                    ->setParameter('job', $job)
-                    ->getResult();
+            ->setParameter('job', $job)
+            ->getResult();
     }
 
     public function findLastJobsWithError($nbJobs = 10)
     {
         return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.state IN (:errorStates) AND j.originalJob IS NULL ORDER BY j.closedAt DESC")
-                    ->setParameter('errorStates', array(Job::STATE_TERMINATED, Job::STATE_FAILED))
-                    ->setMaxResults($nbJobs)
-                    ->getResult();
+            ->setParameter('errorStates', array(Job::STATE_TERMINATED, Job::STATE_FAILED))
+            ->setMaxResults($nbJobs)
+            ->getResult();
     }
 }

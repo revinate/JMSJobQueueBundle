@@ -18,6 +18,9 @@
 
 namespace JMS\JobQueueBundle\Command;
 
+use Doctrine\Common\Util\Debug;
+use JMS\JobQueueBundle\Entity\Repository\JobRepository;
+use Symfony\Component\Config\Definition\Exception\Exception;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 
 use JMS\JobQueueBundle\Exception\LogicException;
@@ -71,19 +74,25 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         $this->dispatcher = $this->getContainer()->get('event_dispatcher');
         $this->getEntityManager()->getConnection()->getConfiguration()->setSQLLogger(null);
 
-        $this->cleanUpStaleJobs();
+        //$this->cleanUpStaleJobs();  -- can't clean up stale jobs when jobs are running across multiple nodes
 
         while (time() - $startTime < $maxRuntime) {
             $this->checkRunningJobs();
 
             $excludedIds = array();
             while (count($this->runningJobs) < $maxConcurrentJobs) {
-                if (null === $pendingJob = $this->getRepository()->findStartableJob($excludedIds)) {
-                    sleep(2);
-                    continue 2; // Check if the maximum runtime has been exceeded.
+                try {
+                    $this->getRepository()->startTrasaction();
+                    if (null === $pendingJob = $this->getRepository()->findStartableJob($excludedIds)) {
+                        $this->getRepository()->commitTransaction();
+                        sleep(2);
+                        continue 2; // Check if the maximum runtime has been exceeded.
+                    }
+                    $this->startJob($pendingJob);
+                    $this->getRepository()->commitTransaction();
+                } catch(Exception $e) {
+                    $this->getRepository()->rollbackTransaction();
                 }
-
-                $this->startJob($pendingJob);
                 sleep(1);
                 $this->checkRunningJobs();
             }
@@ -167,7 +176,6 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $data['job']->setOutput($data['process']->getOutput());
             $data['job']->setErrorOutput($data['process']->getErrorOutput());
             $data['job']->setRuntime(time() - $data['start_time']);
-
             $newState = 0 === $data['process']->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
             $this->getRepository()->closeJob($data['job'], $newState);
             unset($this->runningJobs[$i]);
@@ -285,6 +293,9 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         return $this->registry->getManagerForClass('JMSJobQueueBundle:Job');
     }
 
+    /**
+     * @return JobRepository
+     */
     private function getRepository()
     {
         return $this->getEntityManager()->getRepository('JMSJobQueueBundle:Job');
