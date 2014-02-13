@@ -23,6 +23,7 @@ use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Query\ResultSetMappingBuilder;
 use JMS\DiExtraBundle\Annotation as DI;
+use JMS\JobQueueBundle\Command\RunCommand;
 use JMS\JobQueueBundle\Entity\Job;
 use JMS\JobQueueBundle\Event\StateChangeEvent;
 use Symfony\Bridge\Doctrine\RegistryInterface;
@@ -69,11 +70,12 @@ class JobRepository extends EntityRepository
         $this->_em->getConnection()->rollback();
     }
 
-    public function findJob($command, array $args = array())
+    public function findJob($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE)
     {
-        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args")
+        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName")
             ->setParameter('command', $command)
             ->setParameter('args', $args, Type::JSON_ARRAY)
+            ->setParameter('queueName', $queueName)
             ->setMaxResults(1)
             ->getOneOrNullResult();
     }
@@ -87,19 +89,20 @@ class JobRepository extends EntityRepository
         throw new \RuntimeException(sprintf('Found no job for command "%s" with args "%s".', $command, json_encode($args)));
     }
 
-    public function getOrCreateIfNotExists($command, array $args = array())
+    public function getOrCreateIfNotExists($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE)
     {
-        if (null !== $job = $this->findJob($command, $args)) {
+        if (null !== $job = $this->findJob($command, $args, $queueName)) {
             return $job;
         }
 
-        $job = new Job($command, $args, false);
+        $job = new Job($command, $args, false, $queueName);
         $this->_em->persist($job);
         $this->_em->flush($job);
 
-        $firstJob = $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args ORDER BY j.id ASC")
+        $firstJob = $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName ORDER BY j.id ASC")
             ->setParameter('command', $command)
             ->setParameter('args', $args, 'json_array')
+            ->setParameter('queueName', $queueName)
             ->setMaxResults(1)
             ->getSingleResult();
 
@@ -267,7 +270,7 @@ class JobRepository extends EntityRepository
 
                 // The original job has failed, and we are allowed to retry it.
                 if ($job->isRetryAllowed()) {
-                    $retryJob = new Job($job->getCommand(), $job->getArgs());
+                    $retryJob = new Job($job->getCommand(), $job->getArgs(), true, $job->getQueueName());
                     $retryJob->setMaxRuntime($job->getMaxRuntime());
                     $job->addRetryJob($retryJob);
                     $this->_em->persist($retryJob);

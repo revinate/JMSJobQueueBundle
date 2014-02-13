@@ -20,6 +20,7 @@ namespace JMS\JobQueueBundle\Entity;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
+use JMS\JobQueueBundle\Command\RunCommand;
 use JMS\JobQueueBundle\Exception\InvalidStateTransitionException;
 use JMS\JobQueueBundle\Exception\LogicException;
 use Symfony\Component\HttpKernel\Exception\FlattenException;
@@ -168,10 +169,11 @@ class Job
         return in_array($state, array(self::STATE_CANCELED, self::STATE_FAILED, self::STATE_INCOMPLETE, self::STATE_TERMINATED), true);
     }
 
-    public function __construct($command, array $args = array(), $confirmed = true)
+    public function __construct($command, array $args = array(), $confirmed = true, $queueName = RunCommand::DEFAULT_QUEUE)
     {
         $this->command = $command;
         $this->args = $args;
+        $this->queueName = $queueName;
         $this->state = $confirmed ? self::STATE_PENDING : self::STATE_NEW;
         $this->createdAt = new \DateTime();
         $this->executeAfter = new \DateTime();
@@ -195,6 +197,7 @@ class Job
         $this->runtime = null;
         $this->memoryUsage = null;
         $this->memoryUsageReal = null;
+        $this->queueName = null;
         $this->relatedEntities = new ArrayCollection();
     }
 
@@ -301,6 +304,11 @@ class Job
     public function getQueueName()
     {
         return $this->queueName;
+    }
+
+    public function setQueueName($queueName)
+    {
+        $this->queueName = $queueName;
     }
 
     public function getArgs()
