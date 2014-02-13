@@ -50,7 +50,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         $this
             ->setName('jms-job-queue:run')
             ->setDescription('Runs jobs from the queue.')
-            ->addOption('queue-name', 'q', InputOption::VALUE_REQUIRED, 'the queue name', self::DEFAULT_QUEUE)
+            ->addOption('queue-name', 'qn', InputOption::VALUE_REQUIRED, 'the queue name', self::DEFAULT_QUEUE)
             ->addOption('max-runtime', 'r', InputOption::VALUE_REQUIRED, 'The maximum runtime in seconds.', 900)
             ->addOption('max-concurrent-jobs', 'j', InputOption::VALUE_REQUIRED, 'The maximum number of concurrent jobs.', 5)
         ;

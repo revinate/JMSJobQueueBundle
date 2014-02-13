@@ -100,7 +100,7 @@ class Job
     /** @ORM\Column(type = "string") */
     private $command;
 
-    /** @ORM\Column(type = "string") */
+    /** @ORM\Column(type = "string", name="queueName", nullable = false) */
     private $queueName;
 
     /** @ORM\Column(type = "json_array") */
