@@ -99,6 +99,9 @@ class Job
     /** @ORM\Column(type = "string") */
     private $command;
 
+    /** @ORM\Column(type = "string") */
+    private $queueName;
+
     /** @ORM\Column(type = "json_array") */
     private $args;
 
@@ -293,6 +296,11 @@ class Job
     public function getCommand()
     {
         return $this->command;
+    }
+
+    public function getQueueName()
+    {
+        return $this->queueName;
     }
 
     public function getArgs()

@@ -43,11 +43,14 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     private $dispatcher;
     private $runningJobs = array();
 
+    const DEFAULT_QUEUE = 'DEFAULT_QUEUE';
+
     protected function configure()
     {
         $this
             ->setName('jms-job-queue:run')
             ->setDescription('Runs jobs from the queue.')
+            ->addOption('queue-name', 'q', InputOption::VALUE_REQUIRED, 'the queue name', self::DEFAULT_QUEUE)
             ->addOption('max-runtime', 'r', InputOption::VALUE_REQUIRED, 'The maximum runtime in seconds.', 900)
             ->addOption('max-concurrent-jobs', 'j', InputOption::VALUE_REQUIRED, 'The maximum number of concurrent jobs.', 5)
         ;
@@ -67,6 +70,11 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             throw new InvalidArgumentException('The maximum number of concurrent jobs must be greater than zero.');
         }
 
+        $queueName = (string) $input->getOption('queue-name');
+        if (empty($queueName)) {
+            throw new InvalidArgumentException('The queue name must be specified');
+        }
+
         $this->env = $input->getOption('env');
         $this->verbose = $input->getOption('verbose');
         $this->output = $output;
@@ -83,7 +91,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             while (count($this->runningJobs) < $maxConcurrentJobs) {
                 try {
                     $this->getRepository()->startTrasaction();
-                    if (null === $pendingJob = $this->getRepository()->findStartableJob($excludedIds)) {
+                    if (null === $pendingJob = $this->getRepository()->findStartableJob($queueName, $excludedIds)) {
                         $this->getRepository()->commitTransaction();
                         sleep(2);
                         continue 2; // Check if the maximum runtime has been exceeded.
