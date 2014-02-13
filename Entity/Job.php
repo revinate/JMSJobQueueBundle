@@ -197,7 +197,6 @@ class Job
         $this->runtime = null;
         $this->memoryUsage = null;
         $this->memoryUsageReal = null;
-        $this->queueName = null;
         $this->relatedEntities = new ArrayCollection();
     }
 
