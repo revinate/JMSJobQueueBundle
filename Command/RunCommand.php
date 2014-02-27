@@ -56,6 +56,9 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         ;
     }
 
+    protected function preFindStartableJob() {
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $startTime = time();
@@ -90,6 +93,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $excludedIds = array();
             while (count($this->runningJobs) < $maxConcurrentJobs) {
                 try {
+                    $this->preFindStartableJob();
                     $this->getRepository()->startTrasaction();
                     if (null === $pendingJob = $this->getRepository()->findStartableJob($queueName, $excludedIds)) {
                         $this->getRepository()->commitTransaction();
