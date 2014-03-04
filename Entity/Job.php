@@ -30,6 +30,7 @@ use Symfony\Component\HttpKernel\Exception\FlattenException;
  * @ORM\Table(name = "jms_jobs", indexes = {
  *     @ORM\Index(columns = {"command"}),
  *     @ORM\Index("job_runner", columns = {"executeAfter", "state"}),
+ *     @ORM\Index("started_at_exit_code", columns = {"startedAt", "exitCode"}),
  * })
  * @ORM\ChangeTrackingPolicy("DEFERRED_EXPLICIT")
  *
