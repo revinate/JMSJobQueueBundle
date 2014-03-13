@@ -62,6 +62,9 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     protected function onFailure(Job $job) {
     }
 
+    protected function onSuccess(Job $job) {
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $startTime = time();
@@ -194,6 +197,8 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $newState = 0 === $data['process']->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
             if ($newState == Job::STATE_FAILED) {
                 $this->onFailure($data['job']);
+            } else {
+                $this->onSuccess($data['job']);
             }
             $this->getRepository()->closeJob($data['job'], $newState);
             unset($this->runningJobs[$i]);
