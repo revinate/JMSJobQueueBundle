@@ -81,6 +81,8 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
                     $em = $this->getEntityManager();
                     $em->persist($job);
                     $em->flush($job);
+                } else {
+                    $job->setState(Job::STATE_INCOMPLETE);
                 }
             }
         }
