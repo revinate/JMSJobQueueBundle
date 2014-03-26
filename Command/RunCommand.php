@@ -75,15 +75,16 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
              */
             $job = $job[self::JOB];
             if ($process->isRunning()) {
-                $process->stop(10, SIGTERM);
                 if ($job->getIsIdempotent()) {
+                    $process->stop(10, SIGTERM);
                     $job->reset();
-                    $em = $this->getEntityManager();
-                    $em->persist($job);
-                    $em->flush($job);
                 } else {
+                    $process->stop(10, SIGTERM);
                     $job->setState(Job::STATE_INCOMPLETE);
                 }
+                $em = $this->getEntityManager();
+                $em->persist($job);
+                $em->flush($job);
             }
         }
     }
