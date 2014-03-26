@@ -104,6 +104,25 @@ class Job
     /** @ORM\Column(type = "string", name="queueName", nullable = false) */
     private $queueName;
 
+    /** @ORM\Column(type = "boolean", name="isIdempotent", nullable = false, options={"default" = 0}) */
+    private $isIdempotent;
+
+    /**
+     * @param mixed $isIdempotent
+     */
+    public function setIsIdempotent($isIdempotent)
+    {
+        $this->isIdempotent = $isIdempotent;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getIsIdempotent()
+    {
+        return $this->isIdempotent;
+    }
+
     /** @ORM\Column(type = "json_array") */
     private $args;
 
@@ -170,11 +189,12 @@ class Job
         return in_array($state, array(self::STATE_CANCELED, self::STATE_FAILED, self::STATE_INCOMPLETE, self::STATE_TERMINATED), true);
     }
 
-    public function __construct($command, array $args = array(), $confirmed = true, $queueName = RunCommand::DEFAULT_QUEUE)
+    public function __construct($command, array $args = array(), $confirmed = true, $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false)
     {
         $this->command = $command;
         $this->args = $args;
         $this->queueName = $queueName;
+        $this->isIdempotent = $isIdempotent;
         $this->state = $confirmed ? self::STATE_PENDING : self::STATE_NEW;
         $this->createdAt = new \DateTime();
         $this->executeAfter = new \DateTime();
@@ -220,6 +240,13 @@ class Job
         }
 
         return true;
+    }
+
+    public function reset() {
+        $this->startedAt = null;
+        $this->checkedAt = null;
+        $this->closedAt = null;
+        $this->state = self::STATE_PENDING;
     }
 
     public function setState($newState)

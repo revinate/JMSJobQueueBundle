@@ -19,6 +19,7 @@
 namespace JMS\JobQueueBundle\Command;
 
 use Doctrine\Common\Util\Debug;
+use Doctrine\ORM\EntityManager;
 use JMS\JobQueueBundle\Entity\Repository\JobRepository;
 use Symfony\Component\Config\Definition\Exception\Exception;
 use Symfony\Component\Process\Exception\ProcessFailedException;
@@ -47,6 +48,8 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
 
     const PROCESS = 'process';
 
+    const JOB = 'job';
+
     protected function configure()
     {
         $this
@@ -67,7 +70,19 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
              * @var Process $process
              */
             $process = $job[self::PROCESS];
-            $process->stop(10, SIGTERM);
+            /**
+             * @var Job $job
+             */
+            $job = $job[self::JOB];
+            if ($process->isRunning()) {
+                $process->stop(10, SIGTERM);
+                if ($job->getIsIdempotent()) {
+                    $job->reset();
+                    $em = $this->getEntityManager();
+                    $em->persist($job);
+                    $em->flush($job);
+                }
+            }
         }
     }
 
@@ -155,35 +170,35 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $data['error_output_pointer'] += strlen($newErrorOutput);
 
             if ( ! empty($newOutput)) {
-                $event = new NewOutputEvent($data['job'], $newOutput, NewOutputEvent::TYPE_STDOUT);
+                $event = new NewOutputEvent($data[self::JOB], $newOutput, NewOutputEvent::TYPE_STDOUT);
                 $this->dispatcher->dispatch('jms_job_queue.new_job_output', $event);
                 $newOutput = $event->getNewOutput();
             }
 
             if ( ! empty($newErrorOutput)) {
-                $event = new NewOutputEvent($data['job'], $newErrorOutput, NewOutputEvent::TYPE_STDERR);
+                $event = new NewOutputEvent($data[self::JOB], $newErrorOutput, NewOutputEvent::TYPE_STDERR);
                 $this->dispatcher->dispatch('jms_job_queue.new_job_output', $event);
                 $newErrorOutput = $event->getNewOutput();
             }
 
             if ($this->verbose) {
                 if ( ! empty($newOutput)) {
-                    $this->output->writeln('Job '.$data['job']->getId().': '.str_replace("\n", "\nJob ".$data['job']->getId().": ", $newOutput));
+                    $this->output->writeln('Job '.$data[self::JOB]->getId().': '.str_replace("\n", "\nJob ".$data[self::JOB]->getId().": ", $newOutput));
                 }
 
                 if ( ! empty($newErrorOutput)) {
-                    $this->output->writeln('Job '.$data['job']->getId().': '.str_replace("\n", "\nJob ".$data['job']->getId().": ", $newErrorOutput));
+                    $this->output->writeln('Job '.$data[self::JOB]->getId().': '.str_replace("\n", "\nJob ".$data[self::JOB]->getId().": ", $newErrorOutput));
                 }
             }
 
             // Check whether this process exceeds the maximum runtime, and terminate if that is
             // the case.
-            $runtime = time() - $data['job']->getStartedAt()->getTimestamp();
-            if ($data['job']->getMaxRuntime() > 0 && $runtime > $data['job']->getMaxRuntime()) {
+            $runtime = time() - $data[self::JOB]->getStartedAt()->getTimestamp();
+            if ($data[self::JOB]->getMaxRuntime() > 0 && $runtime > $data[self::JOB]->getMaxRuntime()) {
                 $data[self::PROCESS]->stop(5);
 
-                $this->output->writeln($data['job'].' terminated; maximum runtime exceeded.');
-                $this->getRepository()->closeJob($data['job'], Job::STATE_TERMINATED);
+                $this->output->writeln($data[self::JOB].' terminated; maximum runtime exceeded.');
+                $this->getRepository()->closeJob($data[self::JOB], Job::STATE_TERMINATED);
                 unset($this->runningJobs[$i]);
 
                 continue;
@@ -191,33 +206,33 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
 
             if ($data[self::PROCESS]->isRunning()) {
                 // For long running processes, it is nice to update the output status regularly.
-                $data['job']->addOutput($newOutput);
-                $data['job']->addErrorOutput($newErrorOutput);
-                $data['job']->checked();
+                $data[self::JOB]->addOutput($newOutput);
+                $data[self::JOB]->addErrorOutput($newErrorOutput);
+                $data[self::JOB]->checked();
                 $em = $this->getEntityManager();
-                $em->persist($data['job']);
-                $em->flush($data['job']);
+                $em->persist($data[self::JOB]);
+                $em->flush($data[self::JOB]);
 
                 continue;
             }
 
-            $this->output->writeln($data['job'].' finished with exit code '.$data[self::PROCESS]->getExitCode().'.');
+            $this->output->writeln($data[self::JOB].' finished with exit code '.$data[self::PROCESS]->getExitCode().'.');
 
             // If the Job exited with an exception, let's reload it so that we
             // get access to the stack trace. This might be useful for listeners.
-            $this->getEntityManager()->refresh($data['job']);
+            $this->getEntityManager()->refresh($data[self::JOB]);
 
-            $data['job']->setExitCode($data[self::PROCESS]->getExitCode());
-            $data['job']->setOutput($data[self::PROCESS]->getOutput());
-            $data['job']->setErrorOutput($data[self::PROCESS]->getErrorOutput());
-            $data['job']->setRuntime(time() - $data['start_time']);
+            $data[self::JOB]->setExitCode($data[self::PROCESS]->getExitCode());
+            $data[self::JOB]->setOutput($data[self::PROCESS]->getOutput());
+            $data[self::JOB]->setErrorOutput($data[self::PROCESS]->getErrorOutput());
+            $data[self::JOB]->setRuntime(time() - $data['start_time']);
             $newState = 0 === $data[self::PROCESS]->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
             if ($newState == Job::STATE_FAILED) {
-                $this->onFailure($data['job']);
+                $this->onFailure($data[self::JOB]);
             } else {
-                $this->onSuccess($data['job']);
+                $this->onSuccess($data[self::JOB]);
             }
-            $this->getRepository()->closeJob($data['job'], $newState);
+            $this->getRepository()->closeJob($data[self::JOB], $newState);
             unset($this->runningJobs[$i]);
         }
 
@@ -260,7 +275,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
 
         $this->runningJobs[] = array(
             self::PROCESS => $proc,
-            'job' => $job,
+            self::JOB => $job,
             'start_time' => time(),
             'output_pointer' => 0,
             'error_output_pointer' => 0,
@@ -328,6 +343,9 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         return $pb;
     }
 
+    /**
+     * @return EntityManager
+     */
     private function getEntityManager()
     {
         return $this->registry->getManagerForClass('JMSJobQueueBundle:Job');

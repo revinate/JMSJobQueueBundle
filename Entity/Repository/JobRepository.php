@@ -89,13 +89,13 @@ class JobRepository extends EntityRepository
         throw new \RuntimeException(sprintf('Found no job for command "%s" with args "%s".', $command, json_encode($args)));
     }
 
-    public function getOrCreateIfNotExists($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE, $maxRetries = 0)
+    public function getOrCreateIfNotExists($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false)
     {
         if (null !== $job = $this->findJob($command, $args, $queueName)) {
             return $job;
         }
 
-        $job = new Job($command, $args, false, $queueName);
+        $job = new Job($command, $args, false, $queueName, $isIdempotent);
         $this->_em->persist($job);
         $this->_em->flush($job);
 
