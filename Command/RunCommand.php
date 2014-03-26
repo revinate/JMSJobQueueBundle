@@ -45,6 +45,8 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
 
     const DEFAULT_QUEUE = 'DEFAULT_QUEUE';
 
+    const PROCESS = 'process';
+
     protected function configure()
     {
         $this
@@ -59,6 +61,20 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     protected function preFindStartableJob() {
     }
 
+    public function shutdownGracefully() {
+        foreach($this->runningJobs as $job) {
+            /**
+             * @var Process $process
+             */
+            $process = $job[self::PROCESS];
+            $process->stop(10, SIGTERM);
+        }
+    }
+
+    protected function init() {
+
+    }
+
     protected function onFailure(Job $job) {
     }
 
@@ -67,6 +83,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->init();
         $startTime = time();
 
         $maxRuntime = (integer) $input->getOption('max-runtime');
@@ -131,10 +148,10 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     private function checkRunningJobs()
     {
         foreach ($this->runningJobs as $i => &$data) {
-            $newOutput = substr($data['process']->getOutput(), $data['output_pointer']);
+            $newOutput = substr($data[self::PROCESS]->getOutput(), $data['output_pointer']);
             $data['output_pointer'] += strlen($newOutput);
 
-            $newErrorOutput = substr($data['process']->getErrorOutput(), $data['error_output_pointer']);
+            $newErrorOutput = substr($data[self::PROCESS]->getErrorOutput(), $data['error_output_pointer']);
             $data['error_output_pointer'] += strlen($newErrorOutput);
 
             if ( ! empty($newOutput)) {
@@ -163,7 +180,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             // the case.
             $runtime = time() - $data['job']->getStartedAt()->getTimestamp();
             if ($data['job']->getMaxRuntime() > 0 && $runtime > $data['job']->getMaxRuntime()) {
-                $data['process']->stop(5);
+                $data[self::PROCESS]->stop(5);
 
                 $this->output->writeln($data['job'].' terminated; maximum runtime exceeded.');
                 $this->getRepository()->closeJob($data['job'], Job::STATE_TERMINATED);
@@ -172,7 +189,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
                 continue;
             }
 
-            if ($data['process']->isRunning()) {
+            if ($data[self::PROCESS]->isRunning()) {
                 // For long running processes, it is nice to update the output status regularly.
                 $data['job']->addOutput($newOutput);
                 $data['job']->addErrorOutput($newErrorOutput);
@@ -184,17 +201,17 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
                 continue;
             }
 
-            $this->output->writeln($data['job'].' finished with exit code '.$data['process']->getExitCode().'.');
+            $this->output->writeln($data['job'].' finished with exit code '.$data[self::PROCESS]->getExitCode().'.');
 
             // If the Job exited with an exception, let's reload it so that we
             // get access to the stack trace. This might be useful for listeners.
             $this->getEntityManager()->refresh($data['job']);
 
-            $data['job']->setExitCode($data['process']->getExitCode());
-            $data['job']->setOutput($data['process']->getOutput());
-            $data['job']->setErrorOutput($data['process']->getErrorOutput());
+            $data['job']->setExitCode($data[self::PROCESS]->getExitCode());
+            $data['job']->setOutput($data[self::PROCESS]->getOutput());
+            $data['job']->setErrorOutput($data[self::PROCESS]->getErrorOutput());
             $data['job']->setRuntime(time() - $data['start_time']);
-            $newState = 0 === $data['process']->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
+            $newState = 0 === $data[self::PROCESS]->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
             if ($newState == Job::STATE_FAILED) {
                 $this->onFailure($data['job']);
             } else {
@@ -242,7 +259,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         $this->output->writeln(sprintf('Started %s.', $job));
 
         $this->runningJobs[] = array(
-            'process' => $proc,
+            self::PROCESS => $proc,
             'job' => $job,
             'start_time' => time(),
             'output_pointer' => 0,
