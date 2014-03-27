@@ -64,10 +64,12 @@ class JobRepository extends EntityRepository
 
     public function commitTransaction() {
         $this->_em->getConnection()->commit();
+        $this->_em->flush();
     }
 
     public function rollbackTransaction() {
         $this->_em->getConnection()->rollback();
+        $this->_em->flush();
     }
 
     public function findJob($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE)
