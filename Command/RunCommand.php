@@ -163,7 +163,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         return 0;
     }
 
-    private function checkRunningJobs()
+    protected function checkRunningJobs()
     {
         foreach ($this->runningJobs as $i => &$data) {
             $newOutput = substr($data[self::PROCESS]->getOutput(), $data['output_pointer']);
