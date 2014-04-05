@@ -35,7 +35,6 @@ class JobController
      */
     public function overviewAction()
     {
-        $lastJobsWithError = $this->getRepo()->findLastJobsWithError(5);
         $state = $this->request->query->get('state', null);
         $queue = $this->request->query->get('queue', null);
         $qb = $this->getEm()->createQueryBuilder();
@@ -47,11 +46,6 @@ class JobController
         }
         if (!is_null($queue)) {
             $qb->andWhere('j.queueName = :queue')->setParameter('queue', $queue);
-        }
-
-        foreach ($lastJobsWithError as $i => $job) {
-            $qb->andWhere($qb->expr()->neq('j.id', '?'.$i));
-            $qb->setParameter($i, $job->getId());
         }
 
         $stateQb = $this->getEm()->createQueryBuilder();
@@ -75,7 +69,6 @@ class JobController
         };
 
         return array(
-            'jobsWithError' => $lastJobsWithError,
             'jobPager' => $pager,
             'jobPagerView' => $pagerView,
             'jobPagerGenerator' => $routeGenerator,
