@@ -29,6 +29,8 @@ use Symfony\Component\HttpKernel\Exception\FlattenException;
  * @ORM\Entity(repositoryClass = "JMS\JobQueueBundle\Entity\Repository\JobRepository")
  * @ORM\Table(name = "jms_jobs", indexes = {
  *     @ORM\Index(columns = {"command"}),
+ *     @ORM\Index(columns = {"queueName", "state"}),
+ *     @ORM\Index(columns = {"state", "queueName"}),
  *     @ORM\Index("job_runner", columns = {"executeAfter", "state"}),
  *     @ORM\Index("started_at_exit_code", columns = {"startedAt", "exitCode"}),
  * })

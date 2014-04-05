@@ -8,10 +8,12 @@ use JMS\JobQueueBundle\Entity\Job;
 use Pagerfanta\Adapter\DoctrineORMAdapter;
 use Pagerfanta\Pagerfanta;
 use Pagerfanta\View\TwitterBootstrapView;
+use Revinate\SharedBundle\Lib\FancyArray;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Routing\Router;
 
 class JobController
 {
@@ -34,16 +36,30 @@ class JobController
     public function overviewAction()
     {
         $lastJobsWithError = $this->getRepo()->findLastJobsWithError(5);
-
+        $state = $this->request->query->get('state', null);
+        $queue = $this->request->query->get('queue', null);
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('j')->from('JMSJobQueueBundle:Job', 'j')
                 ->where($qb->expr()->isNull('j.originalJob'))
                 ->orderBy('j.id', 'desc');
+        if (!is_null($state)) {
+            $qb->andWhere('j.state = :state')->setParameter('state', $state);
+        }
+        if (!is_null($queue)) {
+            $qb->andWhere('j.queueName = :queue')->setParameter('queue', $queue);
+        }
 
         foreach ($lastJobsWithError as $i => $job) {
             $qb->andWhere($qb->expr()->neq('j.id', '?'.$i));
             $qb->setParameter($i, $job->getId());
         }
+
+        $stateQb = $this->getEm()->createQueryBuilder();
+        $queueQb = $this->getEm()->createQueryBuilder();
+        $states = FancyArray::make($stateQb->select('distinct(j.state)')->from('JMSJobQueueBundle:Job', 'j')
+            ->orderBy('j.state', 'asc')->getQuery()->execute())->pluck('state');
+        $queues = FancyArray::make($queueQb->select('distinct(j.queueName)')->from('JMSJobQueueBundle:Job', 'j')
+            ->orderBy('j.queueName', 'asc')->getQuery()->execute())->pluck('queueName');
 
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
         $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
@@ -51,8 +67,11 @@ class JobController
 
         $pagerView = new TwitterBootstrapView();
         $router = $this->router;
-        $routeGenerator = function($page) use ($router, $pager) {
-            return $router->generate('jms_jobs_overview', array('page' => $page, 'per_page' => $pager->getMaxPerPage()));
+        $routeGenerator = function($page) use ($router, $pager, $queue, $state) {
+            /**
+             * @var Router $router
+             */
+            return $router->generate('jms_jobs_overview', array('queue' => $queue, 'state' => $state, 'page' => $page, 'per_page' => $pager->getMaxPerPage()));
         };
 
         return array(
@@ -60,6 +79,8 @@ class JobController
             'jobPager' => $pager,
             'jobPagerView' => $pagerView,
             'jobPagerGenerator' => $routeGenerator,
+            'states' => $states,
+            'queues' => $queues
         );
     }
 

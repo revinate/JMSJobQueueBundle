@@ -5,7 +5,41 @@
 
 {% block content %}
 
-<h1><div class="page-header">Overview</div></h1>
+<h1><div class="page-header">
+        <td>Overview</td>
+    </div></h1>
+
+    <div class="navbar">
+        <div class="navbar-inner">
+            <a class="brand" href="{{ path("jms_jobs_overview") }}">Reset Filters</a>
+            <ul class="nav">
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                        State
+                        <b class="caret"></b>
+                    </a>
+                    <ul class="dropdown-menu">
+                        {% for state in states %}
+                            <li><a href="{{ path("jms_jobs_overview", {"state": state, "queue" : app.request.get('queue'), "page" : 1 }) }}">{{ state }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            </ul>
+            <ul class="nav">
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                        Queue
+                        <b class="caret"></b>
+                    </a>
+                    <ul class="dropdown-menu">
+                        {% for queue in queues %}
+                            <li><a href="{{ path("jms_jobs_overview", {"state": app.request.get('state'), "queue" : queue , "page" : 1 }) }}">{{ queue }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
 
 {% if jobPager.haveToPaginate %}
     {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
@@ -19,6 +53,7 @@
             <th>State</th>
             <th>Created At</th>
             <th>Runtime</th>
+            <th>Queue</th>
         </tr>
     </thead>
 
@@ -28,9 +63,10 @@
         <tr>
             <td><a href="{{ path("jms_jobs_details", {"id": job.id}) }}">{{ job.id }}</a></td>
             <td><a href="{{ path("jms_jobs_details", {"id": job.id}) }}">{{ macros.command(job) }}</a></td>
-            <td>{{ macros.state(job) }}</td>
+            <td><a href="{{ path("jms_jobs_overview", {"state": job.state, "queue" : app.request.get('queue'), "page" : 1 }) }}">{{ macros.state(job) }}</a></td>
             <td>{{ macros.ago(job.createdAt) }}</td>
             <td>{{ macros.runtime(job) }}</td>
+            <td><a href="{{ path("jms_jobs_overview", {"state": app.request.get('state'), "queue" : job.queueName, "page" : 1 }) }}">{{ job.queueName }}</a></td>
         </tr>
         {% endfor %}
         <tr>
@@ -42,9 +78,10 @@
         <tr>
             <td><a href="{{ path("jms_jobs_details", {"id": job.id}) }}">{{ job.id }}</a></td>
             <td><a href="{{ path("jms_jobs_details", {"id": job.id}) }}">{{ macros.command(job) }}</a></td>
-            <td>{{ macros.state(job) }}</td>
+            <td><a href="{{ path("jms_jobs_overview", {"state": job.state, "queue" : app.request.get('queue'), "page" : 1 }) }}">{{ macros.state(job) }}</a></td>
             <td>{{ macros.ago(job.createdAt) }}</td>
             <td>{{ macros.runtime(job) }}</td>
+            <td><a href="{{ path("jms_jobs_overview", {"state": app.request.get('state'), "queue" : job.queueName, "page" : 1 }) }}">{{ job.queueName }}</a></td>
         </tr>
         {% else %}
         <tr>
