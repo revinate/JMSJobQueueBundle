@@ -2,6 +2,8 @@
 
 namespace JMS\JobQueueBundle\Twig;
 
+use FSi\Component\DataGrid\Extension\Core\ColumnType\DateTime;
+
 class JobQueueExtension extends \Twig_Extension
 {
     private $linkGenerators = array();
@@ -22,6 +24,7 @@ class JobQueueExtension extends \Twig_Extension
     {
         return array(
             'jms_job_queue_path' => new \Twig_Function_Method($this, 'generatePath', array('is_safe' => array('html' => true))),
+            'date_diff' => new \Twig_Function_Method($this, 'getDateDiff', array('is_safe' => array('html' => true))),
         );
     }
 
@@ -87,6 +90,17 @@ class JobQueueExtension extends \Twig_Extension
         }
 
         throw new \RuntimeException(sprintf('The entity "%s" has no link generator.', get_class($entity)));
+    }
+
+    public function getDateDiff(\DateTime $dateTime1, \DateTime $dateTime2) {
+        $intervalDateTime = $dateTime1->diff($dateTime2);
+        if ($intervalDateTime->format('%H') > 0) {
+            return $intervalDateTime->format('%Hh%Im');
+        } else if ($intervalDateTime->format('%I') > 0) {
+            return $intervalDateTime->format('%im%Ss');
+        } else {
+            return $intervalDateTime->format('%s s');
+        }
     }
 
     public function getName()
