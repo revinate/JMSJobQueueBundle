@@ -65,7 +65,7 @@
             <td><a href="{{ path("jms_jobs_details", {"id": job.id}) }}">{{ macros.command(job) }}</a></td>
             <td><a href="{{ path("jms_jobs_overview", {"state": job.state, "queue" : app.request.get('queue'), "page" : 1 }) }}">{{ macros.state(job) }}</a></td>
             <td>{{ macros.ago(job.createdAt) }}</td>
-            <td>{{ date_diff(job.createdAt, job.startedAt) }}</td>
+            <td>{{ job.startedAt ? date_diff(job.createdAt, job.startedAt) : '' }}</td>
             <td>{{ macros.runtime(job) }}</td>
             <td><a href="{{ path("jms_jobs_overview", {"state": app.request.get('state'), "queue" : job.queueName, "page" : 1 }) }}">{{ job.queueName }}</a></td>
         </tr>
