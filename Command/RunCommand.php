@@ -82,6 +82,8 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
                     $process->stop(10, SIGTERM);
                     $job->setState(Job::STATE_INCOMPLETE);
                 }
+                $job->addErrorOutput("\njob asked to shutdown gracefully\n");
+                $job->setLastGracefullyShutdownAt(new \DateTime());
                 $em = $this->getEntityManager();
                 $em->persist($job);
                 $em->flush($job);

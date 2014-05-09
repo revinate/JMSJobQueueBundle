@@ -37,6 +37,7 @@ class JobController
     {
         $state = $this->request->query->get('state', null);
         $queue = $this->request->query->get('queue', null);
+        $minDelay = $this->request->query->get('delay', null);
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('j')->from('JMSJobQueueBundle:Job', 'j')
                 ->where($qb->expr()->isNull('j.originalJob'))
@@ -47,7 +48,10 @@ class JobController
         if (!is_null($queue)) {
             $qb->andWhere('j.queueName = :queue')->setParameter('queue', $queue);
         }
-
+        if (!is_null($minDelay)) {
+            $timeInSeconds = strtotime("+$minDelay")-time();
+            $qb->andWhere('TIME_DIFF(j.startedAt, j.executeAfter) > :min_delay')->setParameter('min_delay', $timeInSeconds);
+        }
         $stateQb = $this->getEm()->createQueryBuilder();
         $queueQb = $this->getEm()->createQueryBuilder();
         $states = FancyArray::make($stateQb->select('distinct(j.state)')->from('JMSJobQueueBundle:Job', 'j')

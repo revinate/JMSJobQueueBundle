@@ -109,6 +109,26 @@ class Job
     /** @ORM\Column(type = "boolean", name="isIdempotent", nullable = false, options={"default" = 0}) */
     private $isIdempotent;
 
+
+    /** @ORM\Column(type = "datetime", name="lastGracefullyShutdownAt", nullable = true) */
+    private $lastGracefullyShutdownAt;
+
+    /**
+     * @param mixed $lastGracefullyShutdownAt
+     */
+    public function setLastGracefullyShutdownAt($lastGracefullyShutdownAt)
+    {
+        $this->lastGracefullyShutdownAt = $lastGracefullyShutdownAt;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getLastGracefullyShutdownAt()
+    {
+        return $this->lastGracefullyShutdownAt;
+    }
+
     /**
      * @param mixed $isIdempotent
      */
