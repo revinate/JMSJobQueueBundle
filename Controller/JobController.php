@@ -39,7 +39,8 @@ class JobController
         $queue = $this->request->query->get('queue', null);
         $minDelay = $this->request->query->get('delay', null);
         $qb = $this->getEm()->createQueryBuilder();
-        $qb->select('j')->from('JMSJobQueueBundle:Job', 'j')
+        $qb->select('partial j.{id, state, createdAt, startedAt, checkedAt, executeAfter, closedAt, command, exitCode, runtime, queueName, args, lastGracefullyShutdownAt}')
+            ->from('JMSJobQueueBundle:Job', 'j')
                 ->where($qb->expr()->isNull('j.originalJob'))
                 ->orderBy('j.id', 'desc');
         if (!is_null($state)) {
