@@ -43,6 +43,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     private $registry;
     private $dispatcher;
     private $runningJobs = array();
+    const EXIT_CODE_RETRYABLE=131; //should be unreserved - http://www.tldp.org/LDP/abs/html/exitcodes.html
 
     const DEFAULT_QUEUE = 'DEFAULT_QUEUE';
 
@@ -95,7 +96,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
 
     }
 
-    protected function onFailure(Job $job) {
+    protected function onFailure(Job $job, $isRetryAllowed, $isRetryableError) {
     }
 
     protected function onSuccess(Job $job) {
@@ -232,12 +233,15 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $data[self::JOB]->setErrorOutput($data[self::PROCESS]->getErrorOutput());
             $data[self::JOB]->setRuntime(time() - $data['start_time']);
             $newState = 0 === $data[self::PROCESS]->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
+            $isRetryableError = self::EXIT_CODE_RETRYABLE === $data[self::PROCESS]->getExitCode();
             if ($newState == Job::STATE_FAILED) {
-                $this->onFailure($data[self::JOB]);
+                $this->onFailure($data[self::JOB], $data[self::JOB]->isRetryAllowed(), $isRetryableError);
             } else {
                 $this->onSuccess($data[self::JOB]);
             }
-            $this->getRepository()->closeJob($data[self::JOB], $newState);
+            $this->getRepository()->closeJob($data[self::JOB], $newState, $isRetryableError);
+
+            $this->output->writeln($data[self::JOB].' closed successfully');
             unset($this->runningJobs[$i]);
         }
 

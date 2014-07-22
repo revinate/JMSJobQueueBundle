@@ -72,6 +72,16 @@ class JobRepository extends EntityRepository
         $this->_em->flush();
     }
 
+    public function findLastPendingJob($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE) {
+        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName AND j.state = :state ORDER BY j.createdAt DESC")
+            ->setParameter('command', $command)
+            ->setParameter('args', $args, Type::JSON_ARRAY)
+            ->setParameter('queueName', $queueName)
+            ->setParameter('state', Job::STATE_PENDING)
+            ->setMaxResults(1)
+            ->getOneOrNullResult();
+    }
+
     public function findJob($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE)
     {
         return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName")
@@ -80,6 +90,13 @@ class JobRepository extends EntityRepository
             ->setParameter('queueName', $queueName)
             ->setMaxResults(1)
             ->getOneOrNullResult();
+    }
+
+    public function findJobByKey($jobKey) {
+        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.jobKey = :key")
+                ->setParameter('key', $jobKey)
+                ->setMaxResults(1)
+                ->getOneOrNullResult();
     }
 
     public function getJob($command, array $args = array())
@@ -91,22 +108,35 @@ class JobRepository extends EntityRepository
         throw new \RuntimeException(sprintf('Found no job for command "%s" with args "%s".', $command, json_encode($args)));
     }
 
-    public function getOrCreateIfNotExists($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false)
+    public function getOrCreateIfNotExists($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false, $key = null)
     {
-        if (null !== $job = $this->findJob($command, $args, $queueName)) {
+        /** @var Job $job */
+        $job = $key ? $this->findJobByKey($key) : $this->findJob($command, $args, $queueName);
+        if (null !== $job) {
             return $job;
         }
 
-        $job = new Job($command, $args, false, $queueName, $isIdempotent);
+        $job = new Job($command, $args, false, $queueName, $isIdempotent, $key);
         $this->_em->persist($job);
         $this->_em->flush($job);
 
-        $firstJob = $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName ORDER BY j.id ASC")
-            ->setParameter('command', $command)
-            ->setParameter('args', $args, 'json_array')
-            ->setParameter('queueName', $queueName)
-            ->setMaxResults(1)
-            ->getSingleResult();
+        if ($key) {
+            $firstJob = $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName AND j.jobKey = :key ORDER BY j.id ASC")
+                ->setParameter('command', $command)
+                ->setParameter('args', $args, 'json_array')
+                ->setParameter('queueName', $queueName)
+                ->setParameter('key', $key)
+                ->setMaxResults(1)
+                ->getSingleResult();
+        } else { //temp fix -- let's refactor to share logic
+            $firstJob = $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName AND j.jobKey is NULL ORDER BY j.id ASC")
+                ->setParameter('command', $command)
+                ->setParameter('args', $args, 'json_array')
+                ->setParameter('queueName', $queueName)
+                ->setMaxResults(1)
+                ->getSingleResult();
+        }
+
 
         if ($firstJob === $job) {
             $job->setState(Job::STATE_PENDING);
@@ -202,12 +232,12 @@ class JobRepository extends EntityRepository
             ->getOneOrNullResult();
     }
 
-    public function closeJob(Job $job, $finalState)
+    public function closeJob(Job $job, $finalState, $isRetryableError = false)
     {
         $this->_em->getConnection()->beginTransaction();
         try {
             $visited = array();
-            $this->closeJobInternal($job, $finalState, $visited);
+            $this->closeJobInternal($job, $finalState, $visited, $isRetryableError);
             $this->_em->flush();
             $this->_em->getConnection()->commit();
 
@@ -228,7 +258,7 @@ class JobRepository extends EntityRepository
         }
     }
 
-    private function closeJobInternal(Job $job, $finalState, array &$visited = array())
+    private function closeJobInternal(Job $job, $finalState, array &$visited = array(), $isRetryableError = false)
     {
         if (in_array($job, $visited, true)) {
             return;
@@ -264,16 +294,23 @@ class JobRepository extends EntityRepository
                 if ($job->isRetryJob()) {
                     $job->setState($finalState);
                     $this->_em->persist($job);
-
-                    $this->closeJobInternal($job->getOriginalJob(), $finalState);
+                    $tempVisited = array();
+                    $this->closeJobInternal($job->getOriginalJob(), $finalState, $tempVisited, $isRetryableError);
 
                     return;
                 }
 
                 // The original job has failed, and we are allowed to retry it.
-                if ($job->isRetryAllowed()) {
+                if ($job->isRetryAllowed() || $isRetryableError) {
+
                     $retryJob = new Job($job->getCommand(), $job->getArgs(), true, $job->getQueueName());
                     $retryJob->setMaxRuntime($job->getMaxRuntime());
+                    if ($isRetryableError) { //retryable errors could repeat indefinitely -- so let's throttle
+                        //try again in 1 minute
+                        $date = new \DateTime();
+                        $date->setTimestamp(time() + 60);
+                        $retryJob->setExecuteAfter($date);
+                    }
                     $job->addRetryJob($retryJob);
                     $this->_em->persist($retryJob);
                     $this->_em->persist($job);
@@ -296,6 +333,8 @@ class JobRepository extends EntityRepository
                     $job->getOriginalJob()->setState($finalState);
                     $this->_em->persist($job->getOriginalJob());
                 }
+                $job->setErrorOutput(null); //no need to persist error output if job succeeds - we can lean on papertrail.
+                $job->setOutput(null); //no need to persist output if job succeeds - we can lean on papertrail.
                 $job->setState($finalState);
                 $this->_em->persist($job);
 

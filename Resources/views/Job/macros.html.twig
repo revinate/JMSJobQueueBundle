@@ -25,7 +25,7 @@
 {%- endmacro %}
 
 {% macro ago(time, format) -%}
-    <time class="timeago" datetime="{{ time.format(constant("DateTime::ISO8601")) }}">{{ time.format(format|default("Y-m-d H:i:s")) }}</time>
+    <time class="timeago" datetime="{{ time.format(constant("DateTime::ISO8601")) }}">{{ time | date("Y-m-d H:i:s T", "America/Los_Angeles") }}</time>
 {%- endmacro %}
 
 {% macro runtime(job) -%}

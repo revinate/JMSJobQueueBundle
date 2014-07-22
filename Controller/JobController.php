@@ -35,7 +35,7 @@ class JobController
      */
     public function overviewAction()
     {
-        $state = $this->request->query->get('state', null);
+        $state = $this->request->query->get('state  ', null);
         $queue = $this->request->query->get('queue', null);
         $minDelay = $this->request->query->get('delay', null);
         $qb = $this->getEm()->createQueryBuilder();
@@ -55,11 +55,10 @@ class JobController
         }
         $stateQb = $this->getEm()->createQueryBuilder();
         $queueQb = $this->getEm()->createQueryBuilder();
-        $states = FancyArray::make($stateQb->select('distinct(j.state)')->from('JMSJobQueueBundle:Job', 'j')
+        $states = FancyArray::make($stateQb->select('j.state')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.state')
             ->orderBy('j.state', 'asc')->getQuery()->execute())->pluck('state');
-        $queues = FancyArray::make($queueQb->select('distinct(j.queueName)')->from('JMSJobQueueBundle:Job', 'j')
+        $queues = FancyArray::make($queueQb->select('j.queueName')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.queueName')
             ->orderBy('j.queueName', 'asc')->getQuery()->execute())->pluck('queueName');
-
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
         $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
         $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
@@ -83,7 +82,7 @@ class JobController
     }
 
     /**
-     * @Route("/{id}", name = "jms_jobs_details")
+     * @Route("/{id}", name = "jms_jobs_details", options={"expose"=true})
      * @Template
      */
     public function detailsAction(Job $job)
@@ -153,12 +152,14 @@ class JobController
         if (
             Job::STATE_FAILED !== $state &&
             Job::STATE_TERMINATED !== $state &&
-            Job::STATE_INCOMPLETE !== $state
+            Job::STATE_INCOMPLETE !== $state &&
+            Job::STATE_RUNNING !== $state //allow running jobs to be retried (sometimes failed jobs stay in running state)
         ) {
             throw new HttpException(400, 'Given job can\'t be retried');
         }
 
         $retryJob = clone $job;
+        $retryJob->setOriginalJob($job);
 
         $this->getEm()->persist($retryJob);
         $this->getEm()->flush();

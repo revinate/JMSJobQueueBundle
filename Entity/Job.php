@@ -109,9 +109,11 @@ class Job
     /** @ORM\Column(type = "boolean", name="isIdempotent", nullable = false, options={"default" = 0}) */
     private $isIdempotent;
 
-
     /** @ORM\Column(type = "datetime", name="lastGracefullyShutdownAt", nullable = true) */
     private $lastGracefullyShutdownAt;
+
+    /** @ORM\Column(type = "string", name="jobKey", nullable = true) */
+    private $jobKey;
 
     /**
      * @param mixed $lastGracefullyShutdownAt
@@ -211,12 +213,13 @@ class Job
         return in_array($state, array(self::STATE_CANCELED, self::STATE_FAILED, self::STATE_INCOMPLETE, self::STATE_TERMINATED), true);
     }
 
-    public function __construct($command, array $args = array(), $confirmed = true, $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false)
+    public function __construct($command, array $args = array(), $confirmed = true, $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false, $jobKey = null)
     {
         $this->command = $command;
         $this->args = $args;
         $this->queueName = $queueName;
         $this->isIdempotent = $isIdempotent;
+        $this->jobKey = $jobKey;
         $this->state = $confirmed ? self::STATE_PENDING : self::STATE_NEW;
         $this->createdAt = new \DateTime();
         $this->executeAfter = new \DateTime();
@@ -241,6 +244,7 @@ class Job
         $this->memoryUsage = null;
         $this->memoryUsageReal = null;
         $this->relatedEntities = new ArrayCollection();
+        $this->jobKey = null;
     }
 
     public function getId()
@@ -638,5 +642,145 @@ class Job
         }
 
         return true;
+    }
+
+    /**
+     * Set createdAt
+     *
+     * @param \DateTime $createdAt
+     * @return Job
+     */
+    public function setCreatedAt($createdAt)
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    /**
+     * Set startedAt
+     *
+     * @param \DateTime $startedAt
+     * @return Job
+     */
+    public function setStartedAt($startedAt)
+    {
+        $this->startedAt = $startedAt;
+
+        return $this;
+    }
+
+    /**
+     * Set checkedAt
+     *
+     * @param \DateTime $checkedAt
+     * @return Job
+     */
+    public function setCheckedAt($checkedAt)
+    {
+        $this->checkedAt = $checkedAt;
+
+        return $this;
+    }
+
+    /**
+     * Set closedAt
+     *
+     * @param \DateTime $closedAt
+     * @return Job
+     */
+    public function setClosedAt($closedAt)
+    {
+        $this->closedAt = $closedAt;
+
+        return $this;
+    }
+
+    /**
+     * Set command
+     *
+     * @param string $command
+     * @return Job
+     */
+    public function setCommand($command)
+    {
+        $this->command = $command;
+
+        return $this;
+    }
+
+    /**
+     * @param mixed $jobKey
+     */
+    public function setJobKey($jobKey)
+    {
+        $this->jobKey = $jobKey;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getJobKey()
+    {
+        return $this->jobKey;
+    }
+
+    /**
+     * Set args
+     *
+     * @param array $args
+     * @return Job
+     */
+    public function setArgs($args)
+    {
+        $this->args = $args;
+
+        return $this;
+    }
+
+    /**
+     * Set memoryUsage
+     *
+     * @param integer $memoryUsage
+     * @return Job
+     */
+    public function setMemoryUsage($memoryUsage)
+    {
+        $this->memoryUsage = $memoryUsage;
+
+        return $this;
+    }
+
+    /**
+     * Set memoryUsageReal
+     *
+     * @param integer $memoryUsageReal
+     * @return Job
+     */
+    public function setMemoryUsageReal($memoryUsageReal)
+    {
+        $this->memoryUsageReal = $memoryUsageReal;
+
+        return $this;
+    }
+
+    /**
+     * Remove dependencies
+     *
+     * @param \JMS\JobQueueBundle\Entity\Job $dependencies
+     */
+    public function removeDependency(\JMS\JobQueueBundle\Entity\Job $dependencies)
+    {
+        $this->dependencies->removeElement($dependencies);
+    }
+
+    /**
+     * Remove retryJobs
+     *
+     * @param \JMS\JobQueueBundle\Entity\Job $retryJobs
+     */
+    public function removeRetryJob(\JMS\JobQueueBundle\Entity\Job $retryJobs)
+    {
+        $this->retryJobs->removeElement($retryJobs);
     }
 }
