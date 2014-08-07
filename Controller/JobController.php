@@ -35,7 +35,7 @@ class JobController
      */
     public function overviewAction()
     {
-        $state = $this->request->query->get('state  ', null);
+        $state = $this->request->query->get('state', null);
         $queue = $this->request->query->get('queue', null);
         $minDelay = $this->request->query->get('delay', null);
         $qb = $this->getEm()->createQueryBuilder();

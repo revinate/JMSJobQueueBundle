@@ -235,7 +235,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $newState = 0 === $data[self::PROCESS]->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
             $isRetryableError = self::EXIT_CODE_RETRYABLE === $data[self::PROCESS]->getExitCode();
             if ($newState == Job::STATE_FAILED) {
-                $this->onFailure($data[self::JOB], $data[self::JOB]->isRetryAllowed(), $isRetryableError);
+                $this->onFailure($data[self::JOB], $data[self::JOB]->getOriginalJob()->isRetryAllowed(), $isRetryableError);
             } else {
                 $this->onSuccess($data[self::JOB]);
             }
