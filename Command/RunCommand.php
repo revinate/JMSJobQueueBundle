@@ -248,7 +248,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         gc_collect_cycles();
     }
 
-    private function startJob(Job $job)
+    protected function startJob(Job $job)
     {
         $event = new StateChangeEvent($job, Job::STATE_RUNNING);
         $this->dispatcher->dispatch('jms_job_queue.job_state_change', $event);
