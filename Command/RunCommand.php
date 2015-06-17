@@ -44,6 +44,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     private $dispatcher;
     private $runningJobs = array();
     const EXIT_CODE_RETRYABLE=131; //should be unreserved - http://www.tldp.org/LDP/abs/html/exitcodes.html
+    const EXIT_CODE_SUCCESS = 0;
 
     const DEFAULT_QUEUE = 'DEFAULT_QUEUE';
 
@@ -75,12 +76,13 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
              * @var Job $job
              */
             $job = $job[self::JOB];
-            if ($process->isRunning()) {
+            if ($process->isRunning() || $job->isRunning()) {
                 if ($job->getIsIdempotent() || $job->getOriginalJob()->getIsIdempotent()) {
-                    $process->stop(10, SIGTERM);
+                    $process->stop(60, SIGCHLD);
+
                     $job->reset();
                 } else {
-                    $process->stop(10, SIGTERM);
+                    $process->stop(60, SIGCHLD);
                     $job->setState(Job::STATE_INCOMPLETE);
                 }
                 $job->addErrorOutput("\njob asked to shutdown gracefully\n");
@@ -118,6 +120,11 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         }
 
         $queueName = (string) $input->getOption('queue-name');
+        if (! $queueName) {
+            throw new \Exception("Queue name must be defined for a jms process!");
+        }
+        $this->getContainer()->get('revinate.command')->setupCommandPriorToExecution($queueName);
+
         if (empty($queueName)) {
             throw new InvalidArgumentException('The queue name must be specified');
         }
