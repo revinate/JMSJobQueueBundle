@@ -8,7 +8,6 @@ use JMS\JobQueueBundle\Entity\Job;
 use Pagerfanta\Adapter\DoctrineORMAdapter;
 use Pagerfanta\Pagerfanta;
 use Pagerfanta\View\TwitterBootstrapView;
-use Revinate\SharedBundle\Lib\FancyArray;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -55,10 +54,18 @@ class JobController
         }
         $stateQb = $this->getEm()->createQueryBuilder();
         $queueQb = $this->getEm()->createQueryBuilder();
-        $states = FancyArray::make($stateQb->select('j.state')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.state')
-            ->orderBy('j.state', 'asc')->getQuery()->execute())->pluck('state');
-        $queues = FancyArray::make($queueQb->select('j.queueName')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.queueName')
-            ->orderBy('j.queueName', 'asc')->getQuery()->execute())->pluck('queueName');
+        $states = array_map(
+            function($job) {
+                return $job['state'];
+            },
+            $stateQb->select('j.state')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.state')
+                ->orderBy('j.state', 'asc')->getQuery()->execute());
+        $queues = array_map(
+            function($job) {
+                return $job['queueName'];
+            },
+            $queueQb->select('j.queueName')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.queueName')
+                ->orderBy('j.queueName', 'asc')->getQuery()->execute());
         $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
         $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
         $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
