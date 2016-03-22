@@ -333,8 +333,6 @@ class JobRepository extends EntityRepository
                     $job->getOriginalJob()->setState($finalState);
                     $this->_em->persist($job->getOriginalJob());
                 }
-                $job->setErrorOutput(null); //no need to persist error output if job succeeds - we can lean on papertrail.
-                $job->setOutput(null); //no need to persist output if job succeeds - we can lean on papertrail.
                 $job->setState($finalState);
                 $this->_em->persist($job);
 
