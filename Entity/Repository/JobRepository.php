@@ -333,6 +333,7 @@ class JobRepository extends EntityRepository
                     $job->getOriginalJob()->setState($finalState);
                     $this->_em->persist($job->getOriginalJob());
                 }
+                $job->setErrorOutput(null);
                 $job->setState($finalState);
                 $this->_em->persist($job);
 
