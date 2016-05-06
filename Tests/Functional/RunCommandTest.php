@@ -2,6 +2,7 @@
 
 namespace JMS\JobQueueBundle\Tests\Functional;
 
+use Doctrine\ORM\EntityManager;
 use JMS\JobQueueBundle\Entity\Job;
 use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -9,7 +10,9 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 
 class RunCommandTest extends BaseTestCase
 {
+    /** @var  Application */
     private $app;
+    /** @var  EntityManager */
     private $em;
 
     public function testRun()
@@ -23,7 +26,8 @@ class RunCommandTest extends BaseTestCase
 
         $output = $this->doRun(array('--max-runtime' => 5));
         $expectedOutput = "Started Job(id = 1, command = \"a\").\n"
-                         ."Job(id = 1, command = \"a\") finished with exit code 1.\n";
+                         ."Job(id = 1, command = \"a\") finished with exit code 1.\n"
+                         ."Job(id = 1, command = \"a\") closed successfully\n";
         $this->assertEquals($expectedOutput, $output);
         $this->assertEquals('failed', $a->getState());
         $this->assertEquals('', $a->getOutput());
@@ -119,6 +123,7 @@ class RunCommandTest extends BaseTestCase
         $this->app->setCatchExceptions(false);
 
         $this->em = self::$kernel->getContainer()->get('doctrine')->getManagerForClass('JMSJobQueueBundle:Job');
+        self::$kernel->getContainer()->set("revinate.command", new CommandService());
     }
 
     private function doRun(array $args = array())
@@ -128,6 +133,13 @@ class RunCommandTest extends BaseTestCase
         $this->app->run(new ArrayInput($args), $output);
 
         return $output->getOutput();
+    }
+}
+
+class CommandService {
+    public static $queueExecuted = null;
+    public function setupCommandPriorToExecution($queueName) {
+        self::$queueExecuted = $queueName;
     }
 }
 
