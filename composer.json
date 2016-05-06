@@ -17,12 +17,10 @@
         "jms/di-extra-bundle": ">=1.1,<2.0"
     },
     "require-dev": {
-        "doctrine/doctrine-fixtures-bundle": "*",
         "sensio/framework-extra-bundle": "*",
         "symfony/class-loader": "*",
         "symfony/yaml": "*",
         "symfony/browser-kit": "*",
-        "symfony/class-loader": "*",
         "symfony/finder": "*",
         "symfony/css-selector": "*",
         "symfony/process": "*",
@@ -31,7 +29,8 @@
         "doctrine/orm": "*",
         "symfony/form": "*",
         "symfony/validator": "*",
-        "pagerfanta/pagerfanta": "dev-master"
+        "pagerfanta/pagerfanta": "dev-master",
+        "phpunit/phpunit": "*"
     },
     "suggest": {
         "pagerfanta/pagerfanta": "Required when using the webinterface.",
