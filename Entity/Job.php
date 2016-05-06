@@ -29,10 +29,8 @@ use Symfony\Component\HttpKernel\Exception\FlattenException;
  * @ORM\Entity(repositoryClass = "JMS\JobQueueBundle\Entity\Repository\JobRepository")
  * @ORM\Table(name = "jms_jobs", indexes = {
  *     @ORM\Index(columns = {"command"}),
- *     @ORM\Index(columns = {"queueName", "state"}),
- *     @ORM\Index(columns = {"state", "queueName"}),
- *     @ORM\Index("job_runner", columns = {"executeAfter", "state"}),
- *     @ORM\Index("started_at_exit_code", columns = {"startedAt", "exitCode"}),
+ *     @ORM\Index("job_runner", columns = {"executeAfter", "queueName"}),
+ *     @ORM\Index("started_at_exit_code", columns = {"startedAt", "exitCode"})
  * })
  * @ORM\ChangeTrackingPolicy("DEFERRED_EXPLICIT")
  *
@@ -151,7 +149,7 @@ class Job
     private $args;
 
     /**
-     * @ORM\ManyToMany(targetEntity = "Job", fetch = "EAGER")
+     * @ORM\ManyToMany(targetEntity = "Job", fetch = "EXTRA_LAZY")
      * @ORM\JoinTable(name="jms_job_dependencies",
      *     joinColumns = { @ORM\JoinColumn(name = "source_job_id", referencedColumnName = "id") },
      *     inverseJoinColumns = { @ORM\JoinColumn(name = "dest_job_id", referencedColumnName = "id")}
