@@ -68,12 +68,16 @@ class JobRepositoryTest extends BaseTestCase
         $this->repo->startTrasaction();
         $this->assertSame($b, $this->repo->findPendingJob(RunCommand::DEFAULT_QUEUE));
         $this->repo->commitTransaction();
+        $this->repo->startTrasaction();
+        $this->assertNull($this->repo->findPendingJob(RunCommand::DEFAULT_QUEUE, array($b->getId())));
+        $this->repo->commitTransaction();
     }
 
     public function testFindStartableJob()
     {
-        $this->markTestSkipped("disable the dependency");
+        $this->repo->startTrasaction();
         $this->assertNull($this->repo->findStartableJob(RunCommand::DEFAULT_QUEUE));
+        $this->repo->commitTransaction();
 
         $a = new Job('a');
         $a->setState('running');
@@ -86,7 +90,10 @@ class JobRepositoryTest extends BaseTestCase
         $this->em->flush();
 
         $excludedIds = array();
-        $this->assertSame($c, $this->repo->findStartableJob($excludedIds));
+
+        $this->repo->startTrasaction();
+        $this->assertSame($c, $this->repo->findStartableJob(RunCommand::DEFAULT_QUEUE, $excludedIds));
+        $this->repo->commitTransaction();
         $this->assertEquals(array($b->getId()), $excludedIds);
     }
 
@@ -113,7 +120,6 @@ class JobRepositoryTest extends BaseTestCase
 
     public function testFindStartableJobDetachesNonStartableJobs()
     {
-        $this->markTestSkipped("disable dependency");
         $a = new Job('a');
         $b = new Job('b');
         $a->addDependency($b);
@@ -124,13 +130,20 @@ class JobRepositoryTest extends BaseTestCase
         $this->assertTrue($this->em->contains($a));
         $this->assertTrue($this->em->contains($b));
 
+        // detach both from identityMap
+        $this->em->detach($a);
+        $this->em->detach($b);
+        $this->em->clear();
+
         $excludedIds = array();
-        $startableJob = $this->repo->findStartableJob($excludedIds);
+        $this->repo->startTrasaction();
+        $startableJob = $this->repo->findStartableJob(RunCommand::DEFAULT_QUEUE, $excludedIds);
+        $this->repo->commitTransaction();
         $this->assertNotNull($startableJob);
         $this->assertEquals($b->getId(), $startableJob->getId());
         $this->assertEquals(array($a->getId()), $excludedIds);
         $this->assertFalse($this->em->contains($a));
-        $this->assertTrue($this->em->contains($b));
+        $this->assertTrue($this->em->contains($startableJob));
     }
 
     public function testCloseJob()

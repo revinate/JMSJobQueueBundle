@@ -75,19 +75,6 @@ class RunCommandTest extends BaseTestCase
         $this->assertEquals(0, $job->getRetryJobs()->get(1)->getExitCode());
     }
 
-    public function testJobIsTerminatedIfMaxRuntimeIsExceeded()
-    {
-        $this->markTestSkipped('Requires a patched Process class (see symfony/symfony#5030).');
-
-        $job = new Job('jms-job-queue:never-ending');
-        $job->setMaxRuntime(1);
-        $this->em->persist($job);
-        $this->em->flush($job);
-
-        $this->doRun(array('--max-runtime' => 1));
-        $this->assertEquals('terminated', $job->getState());
-    }
-
     /**
      * @group exception
      */

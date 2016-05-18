@@ -33,6 +33,9 @@ use Doctrine\DBAL\LockMode;
 
 class JobRepository extends EntityRepository
 {
+    const PENDING_JOB_DQL = "SELECT j FROM JMSJobQueueBundle:Job j WHERE j.executeAfter < :now AND j.state = :state AND j.queueName = :queueName ORDER BY j.executeAfter ASC";
+    const PENDING_JOB_EXCLUDE_DQL = "SELECT j FROM JMSJobQueueBundle:Job j WHERE j.executeAfter < :now AND j.state = :state AND j.queueName = :queueName AND j.id NOT IN (:excludedIds) ORDER BY j.executeAfter ASC";
+
     private $dispatcher;
     private $registry;
 
@@ -219,17 +222,15 @@ class JobRepository extends EntityRepository
 
     public function findPendingJob($queueName, array $excludedIds = array())
     {
-        if ( ! $excludedIds) {
-            $excludedIds = array(-1);
-        }
-        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j LEFT JOIN j.dependencies d WHERE j.executeAfter < :now AND j.state = :state AND j.queueName = :queueName AND j.id NOT IN (:excludedIds) ORDER BY j.id ASC")
+        $dql = empty($excludedIds) ? self::PENDING_JOB_DQL : self::PENDING_JOB_EXCLUDE_DQL;
+        $query = $this->_em->createQuery($dql)
             ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setMaxResults(1)
             ->setParameter('state', Job::STATE_PENDING)
-            ->setParameter('excludedIds', $excludedIds)
             ->setParameter('queueName', $queueName)
-            ->setParameter('now', new DateTime())
-            ->getOneOrNullResult();
+            ->setParameter('now', new DateTime());
+        $query = empty($excludedIds) ? $query : $query->setParameter('excludedIds', $excludedIds);
+        return $query->getOneOrNullResult();
     }
 
     public function closeJob(Job $job, $finalState, $isRetryableError = false)
