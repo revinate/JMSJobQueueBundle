@@ -158,6 +158,13 @@ class JobRepository extends EntityRepository
     public function findStartableJob($queueName, array &$excludedIds = array())
     {
         while (null !== $job = $this->findPendingJob($queueName, $excludedIds)) {
+            // Lock and refresh the job
+            $job = $this->find($job->getId(), LockMode::PESSIMISTIC_WRITE);
+            // If the job is no longer pending, it means the job was started by another process between we found and locked it.
+            // So let's release the lock right away, in case the job is done and the state can't be changed to "finished" or "failed".
+            if (! $job->isPending()) {
+                return null;
+            }
             if ($job->isStartable()) {
                 return $job;
             }
@@ -222,9 +229,9 @@ class JobRepository extends EntityRepository
 
     public function findPendingJob($queueName, array $excludedIds = array())
     {
+        // find a pending job without any locks
         $dql = empty($excludedIds) ? self::PENDING_JOB_DQL : self::PENDING_JOB_EXCLUDE_DQL;
         $query = $this->_em->createQuery($dql)
-            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->setMaxResults(1)
             ->setParameter('state', Job::STATE_PENDING)
             ->setParameter('queueName', $queueName)
