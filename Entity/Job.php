@@ -159,10 +159,10 @@ class Job
      */
     private $dependencies;
 
-    /** @ORM\Column(type = "text", nullable = true) */
+    ///** @ORM\Column(type = "text", nullable = true) */
     private $output;
 
-    /** @ORM\Column(type = "text", name="errorOutput", nullable = true) */
+    ///** @ORM\Column(type = "text", name="errorOutput", nullable = true) */
     private $errorOutput;
 
     /** @ORM\Column(type = "smallint", name="exitCode", nullable = true, options = {"unsigned": true}) */
@@ -183,7 +183,7 @@ class Job
     /** @ORM\OneToMany(targetEntity = "Job", mappedBy = "originalJob", cascade = {"persist", "remove", "detach"}) */
     private $retryJobs;
 
-    /** @ORM\Column(type = "jms_job_safe_object", name="stackTrace", nullable = true) */
+    ///** @ORM\Column(type = "jms_job_safe_object", name="stackTrace", nullable = true) */
     private $stackTrace;
 
     /** @ORM\Column(type = "smallint", nullable = true, options = {"unsigned": true}) */
