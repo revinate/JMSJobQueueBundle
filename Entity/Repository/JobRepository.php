@@ -82,6 +82,15 @@ class JobRepository extends EntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findMostRecentJob($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE) {
+        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName ORDER BY j.createdAt DESC")
+            ->setParameter('command', $command)
+            ->setParameter('args', $args, Type::JSON_ARRAY)
+            ->setParameter('queueName', $queueName)
+            ->setMaxResults(1)
+            ->getOneOrNullResult();
+    }
+
     public function findJob($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE)
     {
         return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.args = :args AND j.queueName = :queueName")
