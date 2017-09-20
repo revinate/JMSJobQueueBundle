@@ -37,12 +37,12 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand
 {
-    private $env;
-    private $verbose;
-    private $output;
-    private $registry;
-    private $dispatcher;
-    private $runningJobs = array();
+    protected $env;
+    protected $verbose;
+    protected $output;
+    protected $registry;
+    protected $dispatcher;
+    protected $runningJobs = array();
     const EXIT_CODE_RETRYABLE=131; //should be unreserved - http://www.tldp.org/LDP/abs/html/exitcodes.html
     const EXIT_CODE_SUCCESS = 0;
 
@@ -307,7 +307,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
      *
      * In such an error condition, these jobs are cleaned-up on restart of this command.
      */
-    private function cleanUpStaleJobs()
+    protected function cleanUpStaleJobs()
     {
         $repo = $this->getRepository();
         foreach ($repo->findBy(array('state' => Job::STATE_RUNNING)) as $job) {
@@ -336,7 +336,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         }
     }
 
-    private function getCommandProcessBuilder()
+    protected function getCommandProcessBuilder()
     {
         $pb = new ProcessBuilder();
 
@@ -362,7 +362,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     /**
      * @return EntityManager
      */
-    private function getEntityManager()
+    protected function getEntityManager()
     {
         return $this->registry->getManagerForClass('JMSJobQueueBundle:Job');
     }
@@ -370,7 +370,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     /**
      * @return JobRepository
      */
-    private function getRepository()
+    protected function getRepository()
     {
         return $this->getEntityManager()->getRepository('JMSJobQueueBundle:Job');
     }
