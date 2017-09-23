@@ -25,6 +25,7 @@ use Doctrine\ORM\Query\ResultSetMappingBuilder;
 use JMS\DiExtraBundle\Annotation as DI;
 use JMS\JobQueueBundle\Command\RunCommand;
 use JMS\JobQueueBundle\Entity\Job;
+use JMS\JobQueueBundle\Event\RetryEvent;
 use JMS\JobQueueBundle\Event\StateChangeEvent;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -321,6 +322,7 @@ class JobRepository extends EntityRepository
                         $retryJob->setExecuteAfter($date);
                     }
                     $job->addRetryJob($retryJob);
+                    $this->dispatcher->dispatch('jms_job_queue.job_retry', new RetryEvent($retryJob));
                     $this->_em->persist($retryJob);
                     $this->_em->persist($job);
 
