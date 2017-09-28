@@ -23,7 +23,6 @@ use Doctrine\ORM\EntityManager;
 use JMS\JobQueueBundle\Entity\Repository\JobRepository;
 use Symfony\Component\Config\Definition\Exception\Exception;
 use Symfony\Component\Process\Exception\ProcessFailedException;
-
 use JMS\JobQueueBundle\Exception\LogicException;
 use JMS\JobQueueBundle\Exception\InvalidArgumentException;
 use JMS\JobQueueBundle\Event\NewOutputEvent;
@@ -176,33 +175,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     protected function checkRunningJobs()
     {
         foreach ($this->runningJobs as $i => &$data) {
-            $newOutput = substr($data[self::PROCESS]->getOutput(), $data['output_pointer']);
-            $data['output_pointer'] += strlen($newOutput);
-
-            $newErrorOutput = substr($data[self::PROCESS]->getErrorOutput(), $data['error_output_pointer']);
-            $data['error_output_pointer'] += strlen($newErrorOutput);
-
-            if ( ! empty($newOutput)) {
-                $event = new NewOutputEvent($data[self::JOB], $newOutput, NewOutputEvent::TYPE_STDOUT);
-                $this->dispatcher->dispatch('jms_job_queue.new_job_output', $event);
-                $newOutput = $event->getNewOutput();
-            }
-
-            if ( ! empty($newErrorOutput)) {
-                $event = new NewOutputEvent($data[self::JOB], $newErrorOutput, NewOutputEvent::TYPE_STDERR);
-                $this->dispatcher->dispatch('jms_job_queue.new_job_output', $event);
-                $newErrorOutput = $event->getNewOutput();
-            }
-
-            if ($this->verbose) {
-                if ( ! empty($newOutput)) {
-                    $this->output->writeln('Job '.$data[self::JOB]->getId().': '.str_replace("\n", "\nJob ".$data[self::JOB]->getId().": ", $newOutput));
-                }
-
-                if ( ! empty($newErrorOutput)) {
-                    $this->output->writeln('Job '.$data[self::JOB]->getId().': '.str_replace("\n", "\nJob ".$data[self::JOB]->getId().": ", $newErrorOutput));
-                }
-            }
+            list($newOutput, $newErrorOutput) = $this->handleOutput($data);
 
             // Check whether this process exceeds the maximum runtime, and terminate if that is
             // the case.
@@ -235,9 +208,10 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             // get access to the stack trace. This might be useful for listeners.
             $this->getEntityManager()->refresh($data[self::JOB]);
 
+            list($newOutput, $newErrorOutput) = $this->handleOutput($data);
             $data[self::JOB]->setExitCode($data[self::PROCESS]->getExitCode());
-            $data[self::JOB]->setOutput($data[self::PROCESS]->getOutput());
-            $data[self::JOB]->setErrorOutput($data[self::PROCESS]->getErrorOutput());
+            $data[self::JOB]->setOutput($newOutput);
+            $data[self::JOB]->setErrorOutput($newErrorOutput);
             $data[self::JOB]->setRuntime(time() - $data['start_time']);
             $newState = 0 === $data[self::PROCESS]->getExitCode() ? Job::STATE_FINISHED : Job::STATE_FAILED;
             $isRetryableError = self::EXIT_CODE_RETRYABLE === $data[self::PROCESS]->getExitCode();
@@ -253,6 +227,38 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         }
 
         gc_collect_cycles();
+    }
+
+    /**
+     * @param array $data
+     * @return array ["NewStdOut", "NewStdErr"]
+     */
+    protected function handleOutput($data) {
+        $newOutput = $data[self::PROCESS]->getIncrementalOutput();
+        $newErrorOutput = $data[self::PROCESS]->getIncrementalErrorOutput();
+
+        if ( ! empty($newOutput)) {
+            $event = new NewOutputEvent($data[self::JOB], $newOutput, NewOutputEvent::TYPE_STDOUT);
+            $this->dispatcher->dispatch('jms_job_queue.new_job_output', $event);
+            $newOutput = $event->getNewOutput();
+        }
+
+        if ( ! empty($newErrorOutput)) {
+            $event = new NewOutputEvent($data[self::JOB], $newErrorOutput, NewOutputEvent::TYPE_STDERR);
+            $this->dispatcher->dispatch('jms_job_queue.new_job_output', $event);
+            $newErrorOutput = $event->getNewOutput();
+        }
+
+        if ($this->verbose) {
+            if ( ! empty($newOutput)) {
+                $this->output->writeln('Job '.$data[self::JOB]->getId().': '.str_replace("\n", "\nJob ".$data[self::JOB]->getId().": ", $newOutput));
+            }
+
+            if ( ! empty($newErrorOutput)) {
+                $this->output->writeln('Job '.$data[self::JOB]->getId().': '.str_replace("\n", "\nJob ".$data[self::JOB]->getId().": ", $newErrorOutput));
+            }
+        }
+        return [$newOutput, $newErrorOutput];
     }
 
     protected function startJob(Job $job)
