@@ -37,11 +37,12 @@ class JobController
         $state = $this->request->query->get('state', null);
         $queue = $this->request->query->get('queue', null);
         $minDelay = $this->request->query->get('delay', null);
+        $page = max(1, (integer) $this->request->query->get('page', 1));
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('partial j.{id, state, createdAt, startedAt, checkedAt, executeAfter, closedAt, command, exitCode, runtime, queueName, args, lastGracefullyShutdownAt}')
             ->from('JMSJobQueueBundle:Job', 'j')
-                ->where($qb->expr()->isNull('j.originalJob'))
-                ->orderBy('j.id', 'desc');
+            ->where($qb->expr()->isNull('j.originalJob'))
+            ->orderBy('j.id', 'desc');
         if (!is_null($state)) {
             $qb->andWhere('j.state = :state')->setParameter('state', $state);
         }
@@ -52,39 +53,20 @@ class JobController
             $timeInSeconds = strtotime("+$minDelay")-time();
             $qb->andWhere('TIME_DIFF(j.startedAt, j.executeAfter) > :min_delay')->setParameter('min_delay', $timeInSeconds);
         }
-        $stateQb = $this->getEm()->createQueryBuilder();
         $queueQb = $this->getEm()->createQueryBuilder();
-        $states = array_map(
-            function($job) {
-                return $job['state'];
-            },
-            $stateQb->select('j.state')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.state')
-                ->orderBy('j.state', 'asc')->getQuery()->execute());
+        $states = array(Job::STATE_CANCELED, Job::STATE_FAILED, Job::STATE_FINISHED, Job::STATE_INCOMPLETE, Job::STATE_PENDING, Job::STATE_RUNNING, Job::STATE_TERMINATED);
         $queues = array_map(
             function($job) {
                 return $job['queueName'];
             },
-            $queueQb->select('j.queueName')->from('JMSJobQueueBundle:Job', 'j')->groupBy('j.queueName')
-                ->orderBy('j.queueName', 'asc')->getQuery()->execute());
-        $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
-        $pager->setCurrentPage(max(1, (integer) $this->request->query->get('page', 1)));
-        $pager->setMaxPerPage(max(5, min(50, (integer) $this->request->query->get('per_page', 20))));
-
-        $pagerView = new TwitterBootstrapView();
-        $router = $this->router;
-        $routeGenerator = function($page) use ($router, $pager, $queue, $state) {
-            /**
-             * @var Router $router
-             */
-            return $router->generate('jms_jobs_overview', array('queue' => $queue, 'state' => $state, 'page' => $page, 'per_page' => $pager->getMaxPerPage()));
-        };
+            $queueQb->select('distinct j.queueName')->from('JMSJobQueueBundle:Job', 'j')->getQuery()->execute());
+        $jobs = $qb->setMaxResults(20)->setFirstResult(($page - 1) * 20)->getQuery()->getResult();
 
         return array(
-            'jobPager' => $pager,
-            'jobPagerView' => $pagerView,
-            'jobPagerGenerator' => $routeGenerator,
+            'jobPager' => $jobs,
             'states' => $states,
-            'queues' => $queues
+            'queues' => $queues,
+            'page' => $page
         );
     }
 

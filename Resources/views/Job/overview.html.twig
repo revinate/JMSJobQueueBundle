@@ -43,10 +43,28 @@
             </form>
         </div>
     </div>
-
-{% if jobPager.haveToPaginate %}
-    {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
-{% endif %}
+    <div class="pagination">
+        <ul>
+            {% if page == 1 %}
+                <li class="prev disabled"><span>← Previous</span></li>
+                <li class="active"><span>1</span></li>
+            {% else %}
+                <li class="prev"><a href="{{ path("jms_jobs_overview", {"delay" : app.request.get('delay'), "state": app.request.get('state'), "queue" : app.request.get('queue') , "page" : page - 1 }) }}">← Previous</a></li>
+                <li><a href="{{ path("jms_jobs_overview", {"delay" : app.request.get('delay'), "state": app.request.get('state'), "queue" : app.request.get('queue') , "page" : 1 }) }}">1</a></li>
+                {% if page > 5 %}
+                    <li class="disabled"><span>...</span></li>
+                {% endif %}
+            {% endif %}
+            {% for i in max((page - 3), 2)..(page + 3) %}
+                {% if page != i %}
+                    <li><a href="{{ path("jms_jobs_overview", {"delay" : app.request.get('delay'), "state": app.request.get('state'), "queue" : app.request.get('queue') , "page" : i }) }}">{{ i }}</a></li>
+                {% else %}
+                    <li class="active"><span>{{ i }}</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="next"><a href="{{ path("jms_jobs_overview", {"delay" : app.request.get('delay'), "state": app.request.get('state'), "queue" : app.request.get('queue') , "page" : page + 1 }) }}">Next →</a></li>
+        </ul>
+    </div>
 
 <table class="table table-bordered table-striped table-condensed">
     <thead>
@@ -83,9 +101,5 @@
         {% endfor %}
     </tbody>
 </table>
-
-{% if jobPager.haveToPaginate %}
-    {{ jobPagerView.render(jobPager, jobPagerGenerator)|raw }}
-{% endif %}
 
 {% endblock %}
