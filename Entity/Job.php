@@ -572,7 +572,7 @@ class Job
         return $this->checkedAt;
     }
 
-    public function setStackTrace(FlattenException $ex)
+    public function setStackTrace($ex)
     {
         $this->stackTrace = $ex;
     }
