@@ -2,42 +2,50 @@
 
 namespace JMS\JobQueueBundle\Controller;
 
+use Doctrine\Bundle\DoctrineBundle\Registry;
 use Doctrine\Common\Util\ClassUtils;
 use JMS\DiExtraBundle\Annotation as DI;
 use JMS\JobQueueBundle\Entity\Job;
-use Pagerfanta\Adapter\DoctrineORMAdapter;
-use Pagerfanta\Pagerfanta;
-use Pagerfanta\View\TwitterBootstrapView;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Symfony\Component\Routing\Router;
+use Symfony\Component\Routing\RouterInterface;
 
 class JobController
 {
-    /** @DI\Inject("doctrine") */
+    /**
+     * @DI\Inject("doctrine")
+     * @var Registry
+     */
     private $registry;
 
-    /** @DI\Inject */
-    private $request;
-
-    /** @DI\Inject */
+    /**
+     * @DI\Inject
+     * @var RouterInterface
+     */
     private $router;
 
-    /** @DI\Inject("%jms_job_queue.statistics%") */
+    /**
+     * @DI\Inject("%jms_job_queue.statistics%")
+     */
     private $statisticsEnabled;
 
     /**
      * @Route("/", name = "jms_jobs_overview")
-     * @Template
+     * @Template("@JMSJobQueue/Job/overview.html.twig")
+     *
+     * @param Request $request
+     *
+     * @return array
      */
-    public function overviewAction()
+    public function overviewAction(Request $request)
     {
-        $state = $this->request->query->get('state', null);
-        $queue = $this->request->query->get('queue', null);
-        $minDelay = $this->request->query->get('delay', null);
-        $page = max(1, (integer) $this->request->query->get('page', 1));
+        $state = $request->query->get('state', null);
+        $queue = $request->query->get('queue', null);
+        $minDelay = $request->query->get('delay', null);
+        $page = max(1, (integer) $request->query->get('page', 1));
         $qb = $this->getEm()->createQueryBuilder();
         $qb->select('partial j.{id, state, createdAt, startedAt, checkedAt, executeAfter, closedAt, command, exitCode, runtime, queueName, args, lastGracefullyShutdownAt}')
             ->from('JMSJobQueueBundle:Job', 'j')
@@ -72,7 +80,7 @@ class JobController
 
     /**
      * @Route("/{id}", name = "jms_jobs_details", options={"expose"=true})
-     * @Template
+     * @Template("@JMSJobQueue/Job/details.html.twig")
      */
     public function detailsAction(Job $job)
     {
