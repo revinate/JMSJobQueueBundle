@@ -20,6 +20,7 @@ namespace JMS\JobQueueBundle\Entity\Repository;
 
 use Doctrine\Common\Util\ClassUtils;
 use Doctrine\DBAL\Types\Type;
+use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Query\ResultSetMappingBuilder;
 use JMS\DiExtraBundle\Annotation as DI;
@@ -357,16 +358,35 @@ class JobRepository extends EntityRepository
 
     public function findIncomingDependencies(Job $job)
     {
-        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j LEFT JOIN j.dependencies d WHERE :job MEMBER OF j.dependencies")
-            ->setParameter('job', $job)
+        $jobIds = $this->getJobIdsOfIncomingDependencies($job);
+        if (empty($jobIds)) {
+            return array();
+        }
+
+        return $this->_em->createQuery("SELECT j, d FROM JMSJobQueueBundle:Job j LEFT JOIN j.dependencies d WHERE j.id IN (:ids)")
+            ->setParameter('ids', $jobIds)
             ->getResult();
     }
 
     public function getIncomingDependencies(Job $job)
     {
-        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE :job MEMBER OF j.dependencies")
-            ->setParameter('job', $job)
+        $jobIds = $this->getJobIdsOfIncomingDependencies($job);
+        if (empty($jobIds)) {
+            return array();
+        }
+
+        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.id IN (:ids)")
+            ->setParameter('ids', $jobIds)
             ->getResult();
+    }
+
+    private function getJobIdsOfIncomingDependencies(Job $job)
+    {
+        $jobIds = $this->_em->createQuery("SELECT source_job_id FROM jms_job_dependencies WHERE dest_job_id = :job_id")
+            ->setParameter('job_id', $job->getId())
+            ->getResult(AbstractQuery::HYDRATE_ARRAY);
+
+        return $jobIds;
     }
 
     public function findLastJobsWithError($nbJobs = 10)

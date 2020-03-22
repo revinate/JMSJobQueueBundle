@@ -18,6 +18,7 @@ class CleanUpCommand extends ContainerAwareCommand
             ->setName('jms-job-queue:clean-up')
             ->setDescription('Cleans up jobs which exceed the maximum retention time.')
             ->addOption('max-retention', null, InputOption::VALUE_REQUIRED, 'The maximum retention time (value must be parsable by DateTime).', '30 days')
+            ->addOption('per-call', null, InputOption::VALUE_REQUIRED, 'The maximum number of jobs to clean-up per call.', 1000)
         ;
     }
 
@@ -29,25 +30,33 @@ class CleanUpCommand extends ContainerAwareCommand
         /** @var EntityManager $em */
         $em = $registry->getManagerForClass('JMSJobQueueBundle:Job');
 
-        $jobs = $em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.closedAt < :maxRetentionTime AND j.originalJob IS NULL")
-            ->setParameter('maxRetentionTime', new \DateTime('-'.$input->getOption('max-retention')))
-            ->setMaxResults(1000)
-            ->getResult();
+        $count = 0;
+        do {
+            $jobs = $em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.closedAt < :maxRetentionTime AND j.originalJob IS NULL")
+                ->setParameter('maxRetentionTime', new \DateTime('-'.$input->getOption('max-retention')))
+                ->setMaxResults(100)
+                ->getResult();
 
-        foreach ($jobs as $job) {
-            /** @var Job $job */
+            foreach ($jobs as $job) {
+                /** @var Job $job */
 
-            $incomingDepsCount = (integer) $em->createQuery("SELECT COUNT(j) FROM JMSJobQueueBundle:Job j WHERE :job MEMBER OF j.dependencies")
-                ->setParameter('job', $job)
-                ->getSingleScalarResult();
+                $count++;
+                $incomingDepsCount = (integer) $em->createQuery("SELECT COUNT(*) FROM jms_job_dependencies WHERE dest_job_id = :job_id")
+                    ->setParameter('job_id', $job->getId())
+                    ->getSingleScalarResult();
 
-            if ($incomingDepsCount > 0) {
-                continue;
+                if ($incomingDepsCount > 0) {
+                    continue;
+                }
+
+                $em->remove($job);
             }
 
-            $em->remove($job);
-        }
+            $em->flush();
 
-        $em->flush();
+            if ($count >= $input->getOption('per-call')) {
+                break;
+            }
+        } while (! empty($jobs));
     }
 }
