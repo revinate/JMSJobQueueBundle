@@ -383,7 +383,7 @@ class JobRepository extends EntityRepository
     private function getJobIdsOfIncomingDependencies(Job $job)
     {
         $jobIds = $this->_em->getConnection()->executeQuery(
-            "SELECT source_job_id FROM jms_job_dependencies WHERE dest_job_id = :job_id", ['job_id' => 4740959])
+            "SELECT source_job_id FROM jms_job_dependencies WHERE dest_job_id = :job_id", ['job_id' => $job->getId()])
             ->fetchAll(\PDO::FETCH_COLUMN);
         return $jobIds;
     }

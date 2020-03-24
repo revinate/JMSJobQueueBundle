@@ -41,11 +41,10 @@ class CleanUpCommand extends ContainerAwareCommand
                 /** @var Job $job */
 
                 $count++;
-                $incomingDepsCount = (integer) $em->createQuery("SELECT COUNT(*) FROM jms_job_dependencies WHERE dest_job_id = :job_id")
-                    ->setParameter('job_id', $job->getId())
-                    ->getSingleScalarResult();
+                $incomingDepsCount = $em->getConnection()->executeQuery("SELECT source_job_id FROM jms_job_dependencies WHERE dest_job_id = :job_id", ['job_id' => $job->getId()])
+                    ->fetchAll(\PDO::FETCH_COLUMN);
 
-                if ($incomingDepsCount > 0) {
+                if (count($incomingDepsCount) > 0) {
                     continue;
                 }
 
