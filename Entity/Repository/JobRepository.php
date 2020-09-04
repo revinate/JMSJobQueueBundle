@@ -103,8 +103,9 @@ class JobRepository extends EntityRepository
             ->getOneOrNullResult();
     }
 
-    public function findJobByKey($jobKey) {
-        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.jobKey = :key")
+    public function findJobByKey($command, $jobKey) {
+        return $this->_em->createQuery("SELECT j FROM JMSJobQueueBundle:Job j WHERE j.command = :command AND j.jobKey = :key")
+                ->setParameter('command', $command)
                 ->setParameter('key', $jobKey)
                 ->setMaxResults(1)
                 ->getOneOrNullResult();
@@ -122,7 +123,7 @@ class JobRepository extends EntityRepository
     public function getOrCreateIfNotExists($command, array $args = array(), $queueName = RunCommand::DEFAULT_QUEUE, $isIdempotent = false, $key = null)
     {
         /** @var Job $job */
-        $job = $key ? $this->findJobByKey($key) : $this->findJob($command, $args, $queueName);
+        $job = $key ? $this->findJobByKey($command, $key) : $this->findJob($command, $args, $queueName);
         if (null !== $job) {
             return $job;
         }
